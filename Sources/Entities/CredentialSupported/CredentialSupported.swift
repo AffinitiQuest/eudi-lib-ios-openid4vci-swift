@@ -16,12 +16,12 @@
 import Foundation
 
 public enum CredentialSupported: Codable {
-  case scope(Scope)
-  case msoMdoc(MsoMdocFormat.CredentialConfiguration)
-  case w3CSignedJwt(W3CSignedJwtFormat.CredentialConfiguration)
-  case w3CJsonLdSignedJwt(W3CJsonLdSignedJwtFormat.CredentialConfiguration)
-  case w3CJsonLdDataIntegrity(W3CJsonLdDataIntegrityFormat.CredentialConfiguration)
-  case sdJwtVc(SdJwtVcFormat.CredentialConfiguration)
+    case scope(Scope)
+    case msoMdoc(MsoMdocFormat.CredentialConfiguration)
+    case w3CSignedJwt(W3CSignedJwtFormat.CredentialConfiguration)
+    case w3CJsonLdSignedJwt(W3CJsonLdSignedJwtFormat.CredentialConfiguration)
+    case w3CJsonLdDataIntegrity(W3CJsonLdDataIntegrityFormat.CredentialConfiguration)
+    case sdJwtVc(SdJwtVcFormat.CredentialConfiguration)
 }
 
 public extension CredentialSupported {
@@ -79,6 +79,32 @@ public extension CredentialSupported {
       )
 
     case .sdJwtVc(let credentialConfiguration):
+      let issuerEncryption = requester.issuerMetadata.credentialResponseEncryption
+      let responseEncryptionSpec = responseEncryptionSpecProvider(issuerEncryption)
+      
+      if let responseEncryptionSpec {
+        switch issuerEncryption {
+        case .notRequired: break
+        case .required(
+          let algorithmsSupported,
+          let encryptionMethodsSupported
+        ):
+          if !algorithmsSupported.contains(responseEncryptionSpec.algorithm) {
+            throw CredentialIssuanceError.responseEncryptionAlgorithmNotSupportedByIssuer
+          }
+          
+          if !encryptionMethodsSupported.contains(responseEncryptionSpec.encryptionMethod) {
+            throw CredentialIssuanceError.responseEncryptionMethodNotSupportedByIssuer
+          }
+        }
+      }
+     
+      return try credentialConfiguration.toIssuanceRequest(
+        responseEncryptionSpec: issuerEncryption.notRequired ? nil : responseEncryptionSpec,
+        claimSet: claimSet,
+        proofs: proofs
+      )
+    case .w3CSignedJwt(let credentialConfiguration):
       let issuerEncryption = requester.issuerMetadata.credentialResponseEncryption
       let responseEncryptionSpec = responseEncryptionSpecProvider(issuerEncryption)
       

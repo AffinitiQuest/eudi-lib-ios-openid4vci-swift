@@ -190,6 +190,12 @@ public actor IssuanceRequester: IssuanceRequesterType {
             return .success(try response.toDomain())
           }
         }
+      case .w3cJwtVc(let credential):
+          print(credential)
+          guard let response = SingleIssuanceSuccessResponse.fromJSONString(string) else {
+            return .failure(ValidationError.todo(reason: "Cannot decode .notRequired response"))
+          }
+          return .success(try response.toDomain())
       }
       
     } catch {

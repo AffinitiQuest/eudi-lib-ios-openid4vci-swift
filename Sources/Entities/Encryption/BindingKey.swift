@@ -156,6 +156,64 @@ public extension BindingKey {
         )
 
         return .jwt(jws.compactSerializedString)
+      case .w3CSignedJwt(let spec):
+          let suites = spec.proofTypesSupported?["jwt"]?.algorithms.contains { $0 == algorithm.name } ??  true
+          guard suites else {
+            throw CredentialIssuanceError.cryptographicSuiteNotSupported(algorithm.name)
+          }
+
+          let proofs = spec.proofTypesSupported?.keys.contains { $0 == "jwt" } ?? true
+          guard proofs else {
+            throw CredentialIssuanceError.proofTypeNotSupported
+          }
+
+          let aud = issuanceRequester.issuerMetadata.credentialIssuerIdentifier.url.absoluteString
+
+          let headerJwkBase64 = jwk.jsonData()?.base64EncodedString()
+          let headerJwkBase64url = headerJwkBase64?
+              .replacingOccurrences(of: "+", with: "-")
+              .replacingOccurrences(of: "/", with: "_")
+              .replacingOccurrences(of: "=", with: "")
+          
+          let header = try JWSHeader(parameters: [
+            "typ": "openid4vci-proof+jwt",
+            "alg": algorithm.name,
+            "kid": "did:jwk:\(headerJwkBase64url!)#0",
+            "jwk": jwk.toDictionary()
+          ])
+
+          let dictionary: [String: Any] = [
+            JWTClaimNames.issuedAt: Int(Date().timeIntervalSince1970.rounded()),
+            JWTClaimNames.audience: aud,
+            JWTClaimNames.nonce: cNonce ?? "",
+            JWTClaimNames.issuer: issuer ?? ""
+          ].filter { key, value in
+            if let string = value as? String, string.isEmpty {
+              return false
+            }
+            return true
+          }
+
+          let payload = Payload(try dictionary.toThrowingJSONData())
+
+          guard let signatureAlgorithm = SignatureAlgorithm(rawValue: algorithm.name) else {
+            throw CredentialIssuanceError.cryptographicAlgorithmNotSupported
+          }
+          
+          let signer: Signer = try await Self.createSigner(
+            with: header,
+            and: payload,
+            for: privateKey,
+            and: signatureAlgorithm
+          )
+
+          let jws = try JWS(
+            header: header,
+            payload: payload,
+            signer: signer
+          )
+
+          return .jwt(jws.compactSerializedString)
       default: break
       }
       break

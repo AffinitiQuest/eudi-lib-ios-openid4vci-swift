@@ -15,6 +15,7 @@
  */
 import Foundation
 import SwiftyJSON
+import JOSESwift
 
 public struct W3CSignedJwtFormat: FormatProfile {
   
@@ -35,6 +36,91 @@ public struct W3CSignedJwtFormat: FormatProfile {
 }
 
 public extension W3CSignedJwtFormat {
+
+    struct W3cSignedJwtVcSingleCredential: Codable {
+      public let proofs: [Proof]
+      public let format: String = W3CSignedJwtFormat.FORMAT
+      public let vct: String?
+      public let credentialEncryptionJwk: JWK?
+      public let credentialEncryptionKey: SecKey?
+      public let credentialResponseEncryptionAlg: JWEAlgorithm?
+      public let credentialResponseEncryptionMethod: JOSEEncryptionMethod?
+      public let requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption
+      public let credentialIdentifier: CredentialIdentifier?
+      
+      enum CodingKeys: String, CodingKey {
+        case proof
+        case credentialEncryptionJwk
+        case credentialResponseEncryptionAlg
+        case credentialResponseEncryptionMethod
+        case claimSet
+        case credentialDefinition
+        case credentialIdentifier
+      }
+      
+      public init(
+        proofs: [Proof],
+        vct: String?,
+        credentialEncryptionJwk: JWK? = nil,
+        credentialEncryptionKey: SecKey? = nil,
+        credentialResponseEncryptionAlg: JWEAlgorithm? = nil,
+        credentialResponseEncryptionMethod: JOSEEncryptionMethod? = nil,
+        claimSet: ClaimSet? = nil,
+        credentialDefinition: CredentialDefinition,
+        credentialIdentifier: CredentialIdentifier?
+      ) throws {
+        self.proofs = proofs
+        self.vct = vct
+        self.credentialEncryptionJwk = credentialEncryptionJwk
+        self.credentialEncryptionKey = credentialEncryptionKey
+        self.credentialResponseEncryptionAlg = credentialResponseEncryptionAlg
+        self.credentialResponseEncryptionMethod = credentialResponseEncryptionMethod
+        self.credentialIdentifier = credentialIdentifier
+        
+        self.requestedCredentialResponseEncryption = try .init(
+          encryptionJwk: credentialEncryptionJwk,
+          encryptionKey: credentialEncryptionKey,
+          responseEncryptionAlg: credentialResponseEncryptionAlg,
+          responseEncryptionMethod: credentialResponseEncryptionMethod
+        )
+      }
+      
+      public init(from decoder: Decoder) throws {
+        fatalError("No supported yet")
+      }
+      
+      public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(proofs, forKey: .proof)
+        
+        if let credentialEncryptionJwk = credentialEncryptionJwk as? RSAPublicKey {
+          try container.encode(credentialEncryptionJwk, forKey: .credentialEncryptionJwk)
+        } else if let credentialEncryptionJwk = credentialEncryptionJwk as? ECPublicKey {
+          try container.encode(credentialEncryptionJwk, forKey: .credentialEncryptionJwk)
+        }
+        
+        try container.encode(credentialResponseEncryptionAlg, forKey: .credentialResponseEncryptionAlg)
+        try container.encode(credentialResponseEncryptionMethod, forKey: .credentialResponseEncryptionMethod)
+      }
+      
+      public struct CredentialDefinition: Codable {
+        public let type: String
+        public let claims: ClaimSet?
+        
+        enum CodingKeys: String, CodingKey {
+          case type
+          case claims
+        }
+        
+        public init(
+          type: String,
+          claims: ClaimSet?
+        ) {
+          self.type = type
+          self.claims = claims
+        }
+      }
+    }
   
   struct W3CSignedJwtClaimSet: Codable {
     public let claims: [ClaimName: Claim]
@@ -131,6 +217,7 @@ public extension W3CSignedJwtFormat {
       
       return .init(
         scope: scope,
+        docType: credentialDefinition.type.last,
         cryptographicBindingMethodsSupported: bindingMethods,
         credentialSigningAlgValuesSupported: credentialSigningAlgValuesSupported,
         proofTypesSupported: proofTypesSupported,
@@ -143,6 +230,8 @@ public extension W3CSignedJwtFormat {
   
   struct CredentialConfiguration: Codable {
     public let scope: String?
+    public let docType: String?
+    public let vct: String?
     public let cryptographicBindingMethodsSupported: [CryptographicBindingMethod]
     public let credentialSigningAlgValuesSupported: [String]
     public let proofTypesSupported: [String: ProofSigningAlgorithmsSupported]?
@@ -162,6 +251,7 @@ public extension W3CSignedJwtFormat {
     
     public init(
       scope: String?,
+      docType: String?,
       cryptographicBindingMethodsSupported: [CryptographicBindingMethod],
       credentialSigningAlgValuesSupported: [String],
       proofTypesSupported: [String: ProofSigningAlgorithmsSupported]?,
@@ -170,6 +260,8 @@ public extension W3CSignedJwtFormat {
       order: [ClaimName]
     ) {
       self.scope = scope
+        self.vct = nil
+      self.docType = docType
       self.cryptographicBindingMethodsSupported = cryptographicBindingMethodsSupported
       self.credentialSigningAlgValuesSupported = credentialSigningAlgValuesSupported
       self.proofTypesSupported = proofTypesSupported
@@ -180,13 +272,14 @@ public extension W3CSignedJwtFormat {
     
     public init(from decoder: Decoder) throws {
       let container = try decoder.container(keyedBy: CodingKeys.self)
-      
+      vct = nil
       scope = try container.decodeIfPresent(String.self, forKey: .scope)
       cryptographicBindingMethodsSupported = try container.decode([CryptographicBindingMethod].self, forKey: .cryptographicBindingMethodsSupported)
       credentialSigningAlgValuesSupported = try container.decode([String].self, forKey: .credentialSigningAlgValuesSupported)
       proofTypesSupported = try? container.decode([String: ProofSigningAlgorithmsSupported].self, forKey: .proofTypesSupported)
       display = try container.decode([Display].self, forKey: .display)
       credentialDefinition = try container.decode(CredentialDefinition.self, forKey: .credentialDefinition)
+      docType = credentialDefinition.type.last! + "_jwt_vc_json"
       order = try container.decode([ClaimName].self, forKey: .order)
     }
     
@@ -204,6 +297,7 @@ public extension W3CSignedJwtFormat {
     
     init(json: JSON) throws {
       self.scope = json["scope"].string
+      self.vct = nil
       self.cryptographicBindingMethodsSupported = try json["cryptographic_binding_methods_supported"].arrayValue.map {
         try CryptographicBindingMethod(method: $0.stringValue)
       }
@@ -221,16 +315,35 @@ public extension W3CSignedJwtFormat {
         Display(json: json)
       }
       self.credentialDefinition = CredentialDefinition(json: json["credential_definition"])
+      self.docType = self.credentialDefinition.type.last! + "_jwt_vc_json"
+      
       self.order = json["order"].arrayValue.map {
         ClaimName($0.stringValue)
       }
     }
     
     func toIssuanceRequest(
+      responseEncryptionSpec: IssuanceResponseEncryptionSpec? = nil,
       claimSet: ClaimSet?,
       proofs: [Proof]
     ) throws -> CredentialIssuanceRequest {
-      throw ValidationError.error(reason: "Not yet implemented")
+        try CredentialIssuanceRequest.single(
+            .w3cJwtVc(
+                .init(
+                  proofs: proofs,
+                  vct: vct,
+                  credentialEncryptionJwk: responseEncryptionSpec?.jwk,
+                  credentialEncryptionKey: responseEncryptionSpec?.privateKey,
+                  credentialResponseEncryptionAlg: responseEncryptionSpec?.algorithm,
+                  credentialResponseEncryptionMethod: responseEncryptionSpec?.encryptionMethod,
+                  credentialDefinition: .init(
+                    type: credentialDefinition.type.last!,
+                    claims: nil
+                  ),
+                  credentialIdentifier: CredentialIdentifier(value: docType ?? "VerifiableCredential")
+                )
+            ), responseEncryptionSpec
+        )
     }
   }
   
