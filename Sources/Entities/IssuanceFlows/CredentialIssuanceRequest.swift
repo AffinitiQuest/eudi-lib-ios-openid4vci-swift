@@ -58,36 +58,6 @@ public extension MsoMdocClaims {
   }
 }
 
-//public typealias JwtVCMetadataClaims = [ClaimName: Claim]
-//public extension JwtVCMetadataClaims {
-//    init(json: JSON) {
-//        var claims = JwtVCMetadataClaims()
-//        if let _ = json.dictionaryObject {
-//            var namespaceClaims = [ClaimName: Claim]()
-//            for (claimName, claimJSON) in json.dictionaryValue {
-//                let claim = Claim(
-//                    mandatory: claimJSON["mandatory"].bool,
-//                    valueType: claimJSON["valuetype"].string,
-//                    display: claimJSON["display"].arrayValue.compactMap {
-//                        Display(json: $0)
-//                    }
-//                )
-//                namespaceClaims[claimName] = claim
-//            }
-//            claims = namespaceClaims
-//        } else if let jsonArray = json.arrayObject {
-//            for element in jsonArray {
-//                if let dictionary = element as? [String: String] {
-//                    if let key = dictionary.keys.first {
-//                        claims[key] = Claim()
-//                    }
-//                }
-//            }
-//        }
-//        self = claims
-//    }
-//}
-
 public typealias SdJwtVCMetadataClaims = [ClaimName: Claim]
 public extension SdJwtVCMetadataClaims {
   init(json: JSON) {
