@@ -279,7 +279,7 @@ public extension W3CSignedJwtFormat {
       proofTypesSupported = try? container.decode([String: ProofSigningAlgorithmsSupported].self, forKey: .proofTypesSupported)
       display = try container.decode([Display].self, forKey: .display)
       credentialDefinition = try container.decode(CredentialDefinition.self, forKey: .credentialDefinition)
-      docType = credentialDefinition.type.last! + "_jwt_vc_json"
+      docType = credentialDefinition.type.last!// + "_jwt_vc_json"
       order = try container.decode([ClaimName].self, forKey: .order)
     }
     
@@ -315,7 +315,7 @@ public extension W3CSignedJwtFormat {
         Display(json: json)
       }
       self.credentialDefinition = CredentialDefinition(json: json["credential_definition"])
-      self.docType = self.credentialDefinition.type.last! + "_jwt_vc_json"
+      self.docType = self.credentialDefinition.type.last!// + "_jwt_vc_json"
       
       self.order = json["order"].arrayValue.map {
         ClaimName($0.stringValue)
