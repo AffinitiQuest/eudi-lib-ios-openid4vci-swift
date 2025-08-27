@@ -365,7 +365,7 @@ public extension W3CSignedJwtFormat {
       self.type = json["type"].arrayValue.map { $0.stringValue }
       
       var credentialSubjectDict: [ClaimName: Claim?] = [:]
-      let credentialSubjectJSON = json["credential_subject"]
+      let credentialSubjectJSON = json["credentialSubject"]
       for (key, subJSON): (String, JSON) in credentialSubjectJSON.dictionaryValue {
         credentialSubjectDict[key] = Claim(
           mandatory: subJSON["mandatory"].bool,
