@@ -376,6 +376,22 @@ public extension W3CSignedJwtFormat {
       }
       self.credentialSubject = credentialSubjectDict
     }
+
+    public func getClaims() -> [String: Claim]? {
+          guard let credentialSubject = self.credentialSubject else {
+              print("No Claims")
+              return nil
+          }
+          
+          var claims: [String: Claim] = [:]
+          for (key, claim): (String, Claim?) in credentialSubject {
+              if let c = claim {
+                  claims[key] = c
+              }
+          }
+          
+          return claims
+    }
   }
 }
 
