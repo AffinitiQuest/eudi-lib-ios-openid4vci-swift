@@ -70,7 +70,7 @@ public struct AuthorizationCodeRetrieved {
   }
 }
 
-public enum UnauthorizedRequest {
+public enum UnauthorizedRequest: Sendable {
   case par(ParRequested)
   case authorizationCode(AuthorizationCodeRetrieved)
 }
