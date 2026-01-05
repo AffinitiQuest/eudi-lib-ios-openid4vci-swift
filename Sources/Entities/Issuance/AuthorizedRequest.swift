@@ -35,7 +35,7 @@ public extension CanExpire {
   }
 }
 
-public enum AuthorizedRequest {
+public enum AuthorizedRequest: Sendable {
   case noProofRequired(
     accessToken: IssuanceAccessToken,
     refreshToken: IssuanceRefreshToken?,
