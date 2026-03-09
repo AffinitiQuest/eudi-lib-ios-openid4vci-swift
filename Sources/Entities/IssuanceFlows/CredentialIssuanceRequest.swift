@@ -30,6 +30,7 @@ public enum CredentialIssuanceRequest: Sendable {
 public enum SingleCredential: Sendable {
   case msoMdoc(MsoMdocFormat.MsoMdocSingleCredential)
   case sdJwtVc(SdJwtVcFormat.SdJwtVcSingleCredential)
+  case w3cJwtVc(W3CSignedJwtFormat.W3CSignedJwtSingleCredential)
 }
 
 public extension SingleCredential {
@@ -50,6 +51,13 @@ public extension SingleCredential {
       case .configurationBased(let credentialConfigurationIdentifier):
         return credentialConfigurationIdentifier
       }
+    case .w3cJwtVc(let credential):
+      switch credential.requestPayload {
+        case .identifierBased(let credentialConfigurationIdentifier, _):
+          return credentialConfigurationIdentifier
+        case .configurationBased(let credentialConfigurationIdentifier):
+          return credentialConfigurationIdentifier
+        }
     }
   }
   
@@ -58,6 +66,8 @@ public extension SingleCredential {
     case .msoMdoc(let credential):
       return credential.proofs
     case .sdJwtVc(let credential):
+      return credential.proofs
+    case .w3cJwtVc(let credential):
       return credential.proofs
     }
   }
@@ -83,7 +93,17 @@ public extension SingleCredential {
           encryptionSpec: encryptionSpec,
           encryption: credential.requestedCredentialResponseEncryption
         )
-      }
+        
+      case .w3cJwtVc(let credential):
+        try createPayload(
+          proofs: credential.proofs.proofs(),
+          credentialId: extractCredentialId(
+            from: credential.requestPayload
+          ),
+          encryptionSpec: encryptionSpec,
+          encryption: credential.requestedCredentialResponseEncryption
+        )
+    }
   }
   
   // Helper function to extract the credential ID

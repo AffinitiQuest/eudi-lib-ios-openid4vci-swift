@@ -308,9 +308,30 @@ public extension W3CSignedJwtFormat {
     }
     
     func toIssuanceRequest(
+      responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+      credentialIdentifier: CredentialIdentifier? = nil,
+      requestPayload: IssuanceRequestPayload,
       proofs: [Proof]
     ) throws -> CredentialIssuanceRequest {
-      throw ValidationError.error(reason: "Not yet implemented")
+        try CredentialIssuanceRequest.single(
+            .w3cJwtVc(
+                .init(
+                    scope: credentialIdentifier?.value,
+                    proofs: proofs,
+                    credentialEncryptionJwk: responseEncryptionSpec?.jwk,
+                    credentialEncryptionKey: responseEncryptionSpec?.privateKey,
+                    credentialResponseEncryptionAlg: responseEncryptionSpec?.algorithm,
+                    credentialResponseEncryptionMethod: responseEncryptionSpec?.encryptionMethod,
+                    credentialDefinition: .init(
+                        type: credentialDefinition.type.last ?? "VerifiableCredential",
+                        claims: credentialMetadata?.claims ?? []
+                    ),
+                    //requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption.notRequested,
+                    requestPayload: requestPayload,
+                    display: credentialMetadata?.display ?? []
+                )
+            ), responseEncryptionSpec
+        )
     }
   }
   
