@@ -171,7 +171,7 @@ public struct CredentialIssuerMetadata: Decodable, Equatable, Sendable {
         case W3CJsonLdDataIntegrityFormat.FORMAT:
           let profile = try W3CJsonLdDataIntegrityFormat.CredentialConfiguration(json: credJson)
           mapIdentifierCredential[credentialIdentifier] = .w3CJsonLdDataIntegrity(profile)
-        default: throw ValidationError.error(reason: "Unknow credential format")
+        default: continue//throw ValidationError.error(reason: "Unknow credential format")
         }
       }
     }
