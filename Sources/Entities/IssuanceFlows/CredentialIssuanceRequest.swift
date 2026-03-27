@@ -31,6 +31,7 @@ public enum SingleCredential: Sendable {
   case msoMdoc(MsoMdocFormat.MsoMdocSingleCredential)
   case sdJwtVc(SdJwtVcFormat.SdJwtVcSingleCredential)
   case w3cJwtVc(W3CSignedJwtFormat.W3CSignedJwtSingleCredential)
+  case ldpVc(W3CJsonLdDataIntegrityFormat.LdpVcSingleCredential)
 }
 
 public extension SingleCredential {
@@ -58,9 +59,16 @@ public extension SingleCredential {
         case .configurationBased(let credentialConfigurationIdentifier):
           return credentialConfigurationIdentifier
         }
+    case .ldpVc(let credential):
+      switch credential.requestPayload {
+        case .identifierBased(let credentialConfigurationIdentifier, _):
+          return credentialConfigurationIdentifier
+        case .configurationBased(let credentialConfigurationIdentifier):
+          return credentialConfigurationIdentifier
+        }
     }
   }
-  
+
   var proofs: [Proof] {
     switch self {
     case .msoMdoc(let credential):
@@ -68,6 +76,8 @@ public extension SingleCredential {
     case .sdJwtVc(let credential):
       return credential.proofs
     case .w3cJwtVc(let credential):
+      return credential.proofs
+    case .ldpVc(let credential):
       return credential.proofs
     }
   }
@@ -95,6 +105,16 @@ public extension SingleCredential {
         )
         
       case .w3cJwtVc(let credential):
+        try createPayload(
+          proofs: credential.proofs.proofs(),
+          credentialId: extractCredentialId(
+            from: credential.requestPayload
+          ),
+          encryptionSpec: encryptionSpec,
+          encryption: credential.requestedCredentialResponseEncryption
+        )
+
+      case .ldpVc(let credential):
         try createPayload(
           proofs: credential.proofs.proofs(),
           credentialId: extractCredentialId(

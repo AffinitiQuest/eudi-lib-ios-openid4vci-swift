@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import Foundation
+@preconcurrency import Foundation
 import SwiftyJSON
+@preconcurrency import JOSESwift
 
 public struct W3CJsonLdDataIntegrityFormat: FormatProfile {
   
@@ -243,9 +244,108 @@ public extension W3CJsonLdDataIntegrityFormat {
     }
     
     func toIssuanceRequest(
+      responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+      requestPayload: IssuanceRequestPayload,
       proofs: [Proof]
     ) throws -> CredentialIssuanceRequest {
-      throw ValidationError.error(reason: "Not yet implemented")
+      try CredentialIssuanceRequest.single(
+        .ldpVc(
+          .init(
+            scope: nil,
+            proofs: proofs,
+            credentialEncryptionJwk: responseEncryptionSpec?.jwk,
+            credentialEncryptionKey: responseEncryptionSpec?.privateKey,
+            credentialResponseEncryptionAlg: responseEncryptionSpec?.algorithm,
+            credentialResponseEncryptionMethod: responseEncryptionSpec?.encryptionMethod,
+            credentialDefinition: .init(
+              context: credentialDefinition.context,
+              type: credentialDefinition.type,
+              claims: credentialMetadata?.claims ?? []
+            ),
+            requestPayload: requestPayload,
+            display: credentialMetadata?.display ?? []
+          )
+        ), responseEncryptionSpec
+      )
+    }
+  }
+
+  /// Single credential request payload for ldp_vc issuance.
+  struct LdpVcSingleCredential: Codable, Sendable {
+    public let scope: String?
+    public let proofs: [Proof]
+    public let format: String = W3CJsonLdDataIntegrityFormat.FORMAT
+    public let credentialEncryptionJwk: JWK?
+    public let credentialEncryptionKey: SecKey?
+    public let credentialResponseEncryptionAlg: JWEAlgorithm?
+    public let credentialResponseEncryptionMethod: JOSEEncryptionMethod?
+    public let credentialDefinition: CredentialDefinition
+    public let requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption
+    public let requestPayload: IssuanceRequestPayload
+    public let display: [Display]
+
+    enum CodingKeys: String, CodingKey {
+      case scope
+      case proof
+      case format
+      case credentialEncryptionJwk
+      case credentialResponseEncryptionAlg
+      case credentialResponseEncryptionMethod
+      case credentialDefinition
+      case credentialIdentifier
+      case requestPayload
+      case display
+    }
+
+    public init(
+      scope: String?,
+      proofs: [Proof],
+      credentialEncryptionJwk: JWK? = nil,
+      credentialEncryptionKey: SecKey? = nil,
+      credentialResponseEncryptionAlg: JWEAlgorithm? = nil,
+      credentialResponseEncryptionMethod: JOSEEncryptionMethod? = nil,
+      credentialDefinition: CredentialDefinition,
+      requestPayload: IssuanceRequestPayload,
+      display: [Display] = []
+    ) throws {
+      self.scope = scope
+      self.proofs = proofs
+      self.credentialEncryptionJwk = credentialEncryptionJwk
+      self.credentialEncryptionKey = credentialEncryptionKey
+      self.credentialResponseEncryptionAlg = credentialResponseEncryptionAlg
+      self.credentialResponseEncryptionMethod = credentialResponseEncryptionMethod
+      self.credentialDefinition = credentialDefinition
+      self.requestPayload = requestPayload
+      self.requestedCredentialResponseEncryption = try .init(
+        encryptionJwk: credentialEncryptionJwk,
+        encryptionKey: credentialEncryptionKey,
+        responseEncryptionAlg: credentialResponseEncryptionAlg,
+        responseEncryptionMethod: credentialResponseEncryptionMethod
+      )
+      self.display = display
+    }
+
+    public init(from decoder: Decoder) throws {
+      fatalError("Decoding not supported")
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.container(keyedBy: CodingKeys.self)
+      try container.encode(proofs, forKey: .proof)
+      if let credentialEncryptionJwk = credentialEncryptionJwk as? RSAPublicKey {
+        try container.encode(credentialEncryptionJwk, forKey: .credentialEncryptionJwk)
+      } else if let credentialEncryptionJwk = credentialEncryptionJwk as? ECPublicKey {
+        try container.encode(credentialEncryptionJwk, forKey: .credentialEncryptionJwk)
+      }
+      try container.encode(credentialResponseEncryptionAlg, forKey: .credentialResponseEncryptionAlg)
+      try container.encode(credentialResponseEncryptionMethod, forKey: .credentialResponseEncryptionMethod)
+      try container.encode(credentialDefinition, forKey: .credentialDefinition)
+      switch requestPayload {
+      case .identifierBased(_, let credentialIdentifier):
+        try container.encode(credentialIdentifier.value, forKey: .credentialIdentifier)
+      case .configurationBased(let credentialConfigurationIdentifier):
+        try container.encode(credentialConfigurationIdentifier.value, forKey: .credentialIdentifier)
+      }
     }
   }
   

@@ -247,44 +247,17 @@ public actor IssuanceRequester: IssuanceRequesterType {
           }
         }
       case .w3cJwtVc(let credential):
-          switch issuerMetadata.credentialResponseEncryption {
-          case .notSupported:
-            guard let response = SingleIssuanceSuccessResponse.fromJSONString(string) else {
-              return .failure(ValidationError.todo(reason: "Cannot decode .notRequired response"))
-            }
-            return .success(try response.toDomain())
-          case .required, .notRequired:
-            guard let key = credential.credentialEncryptionKey else {
-              return .failure(ValidationError.error(reason: "Invalid private key"))
-            }
-            
-            switch credential.requestedCredentialResponseEncryption {
-            case .notRequested:
-              throw ValidationError.error(reason: "Issuer expects response encryption")
-            case .requested(
-              _,
-              _,
-              let responseEncryptionAlg,
-              let responseEncryptionMethod
-            ):
-              
-              guard
-                let keyManagementAlgorithm = KeyManagementAlgorithm(algorithm: responseEncryptionAlg),
-                let contentEncryptionAlgorithm = ContentEncryptionAlgorithm(encryptionMethod: responseEncryptionMethod)
-              else {
-                return .failure(ValidationError.error(reason: "Unsupported encryption algorithms"))
-              }
-              
-              let payload = try decrypt(
-                jwtString: string,
-                keyManagementAlgorithm: keyManagementAlgorithm,
-                contentEncryptionAlgorithm: contentEncryptionAlgorithm,
-                privateKey: key
-              )
-              let response = try JSONDecoder().decode(SingleIssuanceSuccessResponse.self, from: payload.data())
-              return .success(try response.toDomain())
-            }
-          }
+        return try await decodeOrDecryptIssuanceResponse(
+          string: string,
+          credentialEncryptionKey: credential.credentialEncryptionKey,
+          requestedCredentialResponseEncryption: credential.requestedCredentialResponseEncryption
+        )
+      case .ldpVc(let credential):
+        return try await decodeOrDecryptIssuanceResponse(
+          string: string,
+          credentialEncryptionKey: credential.credentialEncryptionKey,
+          requestedCredentialResponseEncryption: credential.requestedCredentialResponseEncryption
+        )
       }
         
       
@@ -599,6 +572,43 @@ private extension IssuanceRequester {
     }
   }
   
+  func decodeOrDecryptIssuanceResponse(
+    string: String,
+    credentialEncryptionKey: SecKey?,
+    requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption
+  ) async throws -> Result<CredentialIssuanceResponse, Error> {
+    switch issuerMetadata.credentialResponseEncryption {
+    case .notSupported:
+      guard let response = SingleIssuanceSuccessResponse.fromJSONString(string) else {
+        return .failure(ValidationError.todo(reason: "Cannot decode .notRequired response"))
+      }
+      return .success(try response.toDomain())
+    case .required, .notRequired:
+      guard let key = credentialEncryptionKey else {
+        return .failure(ValidationError.error(reason: "Invalid private key"))
+      }
+      switch requestedCredentialResponseEncryption {
+      case .notRequested:
+        throw ValidationError.error(reason: "Issuer expects response encryption")
+      case .requested(_, _, let responseEncryptionAlg, let responseEncryptionMethod):
+        guard
+          let keyManagementAlgorithm = KeyManagementAlgorithm(algorithm: responseEncryptionAlg),
+          let contentEncryptionAlgorithm = ContentEncryptionAlgorithm(encryptionMethod: responseEncryptionMethod)
+        else {
+          return .failure(ValidationError.error(reason: "Unsupported encryption algorithms: \(responseEncryptionAlg.name), \(responseEncryptionMethod.name)"))
+        }
+        let payload = try decrypt(
+          jwtString: string,
+          keyManagementAlgorithm: keyManagementAlgorithm,
+          contentEncryptionAlgorithm: contentEncryptionAlgorithm,
+          privateKey: key
+        )
+        let response = try JSONDecoder().decode(SingleIssuanceSuccessResponse.self, from: payload.data())
+        return .success(try response.toDomain())
+      }
+    }
+  }
+
   func decrypt(
     jwtString: String,
     keyManagementAlgorithm: KeyManagementAlgorithm,
