@@ -124,7 +124,7 @@ public actor AuthorizationServerMetadataResolver: AuthorizationServerMetadataRes
     do {
       guard let insertedUrl = modifyURL(
         url: url,
-        modificationType: .appendPathComponents(wellKnown, server)
+        modificationType: .insertPathComponents(wellKnown, server)
       ) else {
         return nil
       }
@@ -137,7 +137,7 @@ public actor AuthorizationServerMetadataResolver: AuthorizationServerMetadataRes
       
       guard let appendedUrl = modifyURL(
         url: url,
-        modificationType: .insertPathComponents(wellKnown, server)
+        modificationType: .appendPathComponents(wellKnown, server)
       ) else {
         return nil
       }
