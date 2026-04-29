@@ -38,8 +38,8 @@ public extension CredentialSupported {
       return configuration.proofTypesSupported?.isEmpty == false
     case .w3CJsonLdSignedJwt:
       return false
-    case .w3CJsonLdDataIntegrity:
-      return false
+    case .w3CJsonLdDataIntegrity(let configuration):
+      return configuration.proofTypesSupported?.isEmpty == false
     case .sdJwtVc(let configuration):
       return configuration.proofTypesSupported?.isEmpty == false
     }
@@ -152,6 +152,8 @@ public extension CredentialSupported {
       spec.proofTypesSupported
     case .sdJwtVc(let spec):
       spec.proofTypesSupported
+    case .w3CJsonLdDataIntegrity(let spec):
+      spec.proofTypesSupported
     default:
       nil
     }
@@ -172,6 +174,12 @@ public extension CredentialSupported {
         }
       } ?? []
     case .w3CSignedJwt(let spec):
+      spec.proofTypesSupported?[type.rawValue].map { meta in
+        meta.algorithms.compactMap { algorithm in
+          SignatureAlgorithm(rawValue: algorithm)
+        }
+      } ?? []
+    case .w3CJsonLdDataIntegrity(let spec):
       spec.proofTypesSupported?[type.rawValue].map { meta in
         meta.algorithms.compactMap { algorithm in
           SignatureAlgorithm(rawValue: algorithm)
